@@ -49,13 +49,19 @@ param (
 
     [Parameter(Mandatory = $false)]
     [String]
+    [ValidateNotNullOrEmpty()]
+    [ValidateScript({Test-Path -Path $_})]
     $SigningKeyFilePath,
 
     [Parameter(Mandatory = $false)]
+    [ValidateNotNullOrEmpty()]
+    [ValidateScript({Test-Path -Path $_})]
     [String]
     $SignatureFilePath,
 
     [Parameter(Mandatory = $false)]
+    [ValidateNotNullOrEmpty()]
+    [ValidateScript({Test-Path -Path $_})]
     [String]
     $FileToValidatePath,
 
@@ -65,10 +71,13 @@ param (
     $Hash,
 
     [Parameter(Mandatory = $false)]
+    [ValidateNotNullOrEmpty()]
+    [ValidateScript({Test-Path -Path $_})]
     [String]
     $FileToHashPath,
 
     [Parameter(Mandatory = $false)]
+    [ValidateNotNullOrEmpty()]
     [String]
     $Algorithm
 )
@@ -85,10 +94,19 @@ if ($Gpg) {
     if (-not (Test-Path -Path "C:\Program Files (x86)\gnupg\bin\gpg.exe")) {
         try {
             $GpgDownloadUri = "https://gnupg.org/ftp/gcrypt/binary/gnupg-w32-2.2.19_20191207.exe"
-            Invoke-WebRequest -Uri $GpgDownloadUri -OutFile "$($env:UserProfile)\Downloads"
+            $ExeFilePath = "$($env:UserProfile)\Downloads\$($GpgDownloadUri.Split('/')[6])"
+            Write-Verbose -Message "Attempting to download Gnupg..."
+            Invoke-WebRequest -Uri $GpgDownloadUri -OutFile $ExeFilePath -Verbose:($PSBoundParameters["Verbose"] -eq $true)
         }
         catch {
-            ###
+            Write-Error -Message "Failed to download Gnupg with the following error: $($_.Exception.Message)"
+            break
         }
+        # Install Gpg from exe file.
+        Write-Verbose -Message "Attempting to install Gnupg..."
+        Start-Process -FilePath $ExeFilePath -ArgumentList '/S' -NoNewWindow -Wait -PassThru
+        Write-Verbose -Message "Gnupg successfully installed."
     }
+    # Begin Gpg operations.
+
 }
