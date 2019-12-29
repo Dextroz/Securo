@@ -3,6 +3,8 @@ A small PowerShell script for doing security related tasks.
 
 ## Usage
 
+* For GnuPG usage, the script checks that GnuPG is installed on the system, if not, attempts to install it.
+
 Usage is quite self-explanatory:
 
 ```powershell
