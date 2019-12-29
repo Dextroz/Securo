@@ -29,20 +29,35 @@ SOFTWARE.
         A script for running a variety of security related tasks such as gpg, hashing and more.
     
     .PARAMETER Gpg
-        The path to the directory which PIA is installed. Defaults to: "C:\Program Files\Private Internet Access".
+        Run a GnuPG related task.
     
-    .PARAMETER Timeout
-        The time to wait for the command to execute before failing. Measured in seconds.
+    .PARAMETER SigningKeyFilePath
+        The path to the signing key to add to the GnuPG key ring.
+
+    .PARAMETER SignatureFilePath
+        The path to the .sig (signature) file. Used in the verification process.
+    
+    .PARAMETER FileToValidatePath
+        The path to the file to verify the integirty of.
+
+    .PARAMETER Hash
+        Run a hash related task.
+
+    .PARAMETER FileToHashPath
+        The path to the file to validate the integrity of.
+
+    .PARAMETER Algorithm
+        The hashing algorithm to use during the integrity checking process.
 
     .EXAMPLE
-        Connect-PIA -PIAInstallationPath "D:\Private Internet Access" -Timeout 10 -Verbose
+        .\Securo.ps1 -Gpg -SigningKeyFilePath "path/to/key/tails-signing.key" -SignatureFilePath "path/to/sig/tails-amd64-4.1.1.img.sig" -FileToValidatePath "path/to/file/tails-amd64.img" -Verbose
 
     .EXAMPLE
-        Connect-PIA
+        .\Securo.ps1 -Hash -FileToHashPath ".\Securo.ps1" -Algorithm "SHA256"
 #>
 [CmdletBinding()]
 param (
-    # Parameters for Gpg.
+    # Parameters for GnuPG.
     [Parameter(Mandatory = $false)]
     [Switch]
     $Gpg,
@@ -50,18 +65,18 @@ param (
     [Parameter(Mandatory = $false)]
     [String]
     [ValidateNotNullOrEmpty()]
-    [ValidateScript({Test-Path -Path $_})]
+    [ValidateScript( { Test-Path -Path $_ })]
     $SigningKeyFilePath,
 
     [Parameter(Mandatory = $false)]
     [ValidateNotNullOrEmpty()]
-    [ValidateScript({Test-Path -Path $_})]
+    [ValidateScript( { Test-Path -Path $_ })]
     [String]
     $SignatureFilePath,
 
     [Parameter(Mandatory = $false)]
     [ValidateNotNullOrEmpty()]
-    [ValidateScript({Test-Path -Path $_})]
+    [ValidateScript( { Test-Path -Path $_ })]
     [String]
     $FileToValidatePath,
 
@@ -72,15 +87,18 @@ param (
 
     [Parameter(Mandatory = $false)]
     [ValidateNotNullOrEmpty()]
-    [ValidateScript({Test-Path -Path $_})]
+    [ValidateScript( { Test-Path -Path $_ })]
     [String]
     $FileToHashPath,
 
     [Parameter(Mandatory = $false)]
     [ValidateNotNullOrEmpty()]
+    [ValidateScript( { if (-not ($_ -in @("SHA1", "SHA256", "SHA384", "SHA512", "MD5"))) { Write-Error -Message "Invalid algorithm type." break } })]
     [String]
     $Algorithm
 )
+
+$Version = "0.0.1"
 
 # Check that a switch is supplied.
 if (-not $Gpg -and -not $Hash) {
@@ -88,25 +106,72 @@ if (-not $Gpg -and -not $Hash) {
     break
 }
 
-# Gpg related tasks.
+# GnuPG related tasks.
 if ($Gpg) {
-    # Check Gpg is installed, if not, install it.
-    if (-not (Test-Path -Path "C:\Program Files (x86)\gnupg\bin\gpg.exe")) {
+    $GpgInstallLocation = "C:\Program Files (x86)\GnuPG\bin\gpg.exe"
+    # Check GnuPG is installed, if not, install it.
+    Write-Verbose -Message "Checking GnuPG is installed."
+    if (-not (Test-Path -Path $GpgInstallLocation)) {
         try {
+            Write-Verbose -Message "GnuPG is not installed, attempting to download and install it."
             $GpgDownloadUri = "https://gnupg.org/ftp/gcrypt/binary/gnupg-w32-2.2.19_20191207.exe"
             $ExeFilePath = "$($env:UserProfile)\Downloads\$($GpgDownloadUri.Split('/')[6])"
-            Write-Verbose -Message "Attempting to download Gnupg..."
+            Write-Verbose -Message "Attempting to download GnuPG..."
             Invoke-WebRequest -Uri $GpgDownloadUri -OutFile $ExeFilePath -Verbose:($PSBoundParameters["Verbose"] -eq $true)
         }
         catch {
-            Write-Error -Message "Failed to download Gnupg with the following error: $($_.Exception.Message)"
+            Write-Error -Message "Failed to download GnuPG with the following error: $($_.Exception.Message)"
             break
         }
-        # Install Gpg from exe file.
-        Write-Verbose -Message "Attempting to install Gnupg..."
-        Start-Process -FilePath $ExeFilePath -ArgumentList '/S' -NoNewWindow -Wait -PassThru
-        Write-Verbose -Message "Gnupg successfully installed."
+        # Install GnuPG from exe file.
+        Write-Verbose -Message "GnuPG downloaded successfully. Attempting to install GnuPG..."
+        Start-Process -FilePath $ExeFilePath -ArgumentList '/S' -NoNewWindow -Wait -Verbose:($PSBoundParameters["Verbose"] -eq $true) | Out-Null
+        Write-Verbose -Message "GnuPG installed successfully."
     }
-    # Begin Gpg operations.
+    else {
+        Write-Verbose -Message "GnuPG is already installed."
+    }
+    # Begin GnuPG operations.
+    # Current GnuPG operation supported is checking a file using a signing key, signure file and the file to check the integrity of.
+    # Add signing key to GnuPG key ring.
+    Write-Verbose -Message "Adding signing key: $($SigningKeyFilePath) to GnuPG key ring..."
+    try {
+        $Command = Start-Process -FilePath $GpgInstallLocation -ArgumentList "--import $($SigningKeyFilePath)" -NoNewWindow -Wait -Verbose:($PSBoundParameters["Verbose"] -eq $true)
+        Write-Output -InputObject $Command
+        Write-Verbose -Message "Signing key: $($SigningKeyFilePath) successfully added to GnuPG key ring."
+    }
+    catch {
+        Write-Error -Message "Failed to add signing key: $($SigningKeyFilePath) to GnuPG key ring with the following error: $($_.Exception.Message)"
+        break
+    }
+    # Check the signature of the file.
+    try {
+        Write-Verbose -Message "Verifying file: $($FileToValidatePath)..."
+        $Command = Start-Process -FilePath $GpgInstallLocation -ArgumentList "--verify $($SignatureFilePath) $($FileToValidatePath)" -NoNewWindow -Wait -Verbose:($PSBoundParameters["Verbose"] -eq $true)
+        # Check output contains "good signature".
+        if (-not ($Command -like "*Good signature*")) {
+            Write-Error -Message "The file: $($FileToValidatePath) failed verification.`nFull output: $($Command)"
+            break
+        }
+        else {
+            Write-Output -InputObject "The file: $($FileToValidatePath) passed verification.`nFull output: $($Command)"
+        }
+    }
+    catch {
+        Write-Error -Message "GnuPG verify process failed with the following error: $($_.Exception.Message)"
+        break
+    }
+}
 
+# Hashing related tasks.
+if ($Hash) {
+    Write-Verbose -Message "Attempting to generate hash for the file: $($FileToHashPath) using the algorithm: $($Algorithm)"
+    try {
+        $Command = Get-FileHash -Path $FileToHashPath -Algorithm $Algorithm -Verbose:($PSBoundParameters["Verbose"] -eq $true)
+        Write-Output -InputObject "File hash: $($Command.Hash) using the algorithm: $($Algorithm)"
+    }
+    catch {
+        Write-Error -Message "Failed to hash the file: $($FileToHashPath) with the following error: $($_.Exception.Message)"
+        break
+    }
 }
