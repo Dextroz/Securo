@@ -8,11 +8,15 @@ A small PowerShell script for doing security related tasks.
 Usage is quite self-explanatory:
 
 ```powershell
-.\Securo.ps1 -Gpg -SigningKeyFilePath "path/to/key/tails-signing.key" -SignatureFilePath "path/to/sig/tails-amd64-4.1.1.img.sig" -FileToValidatePath "path/to/file/tails-amd64.img" -Verbose
+.\Securo.ps1 -Gpg -SigningKeyFilePath "path\to\key\tails-signing.key" -SignatureFilePath "path\to\sig\tails-amd64-4.1.1.img.sig" -FileToValidatePath "path\to\file\tails-amd64.img" -Verbose
 
 # OR
 
 .\Securo.ps1 -Hash -FileToHashPath ".\Securo.ps1" -Algorithm "SHA256"
+
+# OR
+
+.\Securo.ps1 -Hash -FileDirHashPath "D:\path\to\directory" -Algorithm "MD5" -Verbose
 ```
 
 ## Contributing
