@@ -50,13 +50,13 @@ SOFTWARE.
         The hashing algorithm to use during the integrity checking process.
 
     .EXAMPLE
-        .\Securo.ps1 -Gpg -SigningKeyFilePath "path/to/key/tails-signing.key" -SignatureFilePath "path/to/sig/tails-amd64-4.1.1.img.sig" -FileToValidatePath "path/to/file/tails-amd64.img" -Verbose
+        .\Securo.ps1 -Gpg -SigningKeyFilePath "path\to\key\tails-signing.key" -SignatureFilePath "path\to\sig\tails-amd64-4.1.1.img.sig" -FileToValidatePath "path\to\file\tails-amd64.img" -Verbose
 
     .EXAMPLE
         .\Securo.ps1 -Hash -FileToHashPath ".\Securo.ps1" -Algorithm "SHA256" -Verbose
 
     .EXAMPLE
-        .\Securo.ps1 -Hash -FileDirHashPath "D:\path/to/directory" -Algorithm "MD5" -Verbose
+        .\Securo.ps1 -Hash -FileDirHashPath "D:\path\to\directory" -Algorithm "MD5" -Verbose
 #>
 [CmdletBinding()]
 param (
