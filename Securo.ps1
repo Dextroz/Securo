@@ -43,17 +43,20 @@ SOFTWARE.
     .PARAMETER Hash
         Run a hash related task.
 
-    .PARAMETER FileToHashPath
-        The path to the file to validate the integrity of.
+    .PARAMETER FileDirHashPath
+        The path to the file or directory to validate the integrity of.
 
     .PARAMETER Algorithm
         The hashing algorithm to use during the integrity checking process.
 
     .EXAMPLE
-        .\Securo.ps1 -Gpg -SigningKeyFilePath "path/to/key/tails-signing.key" -SignatureFilePath "path/to/sig/tails-amd64-4.1.1.img.sig" -FileToValidatePath "path/to/file/tails-amd64.img" -Verbose
+        .\Securo.ps1 -Gpg -SigningKeyFilePath "path\to\key\tails-signing.key" -SignatureFilePath "path\to\sig\tails-amd64-4.1.1.img.sig" -FileToValidatePath "path\to\file\tails-amd64.img" -Verbose
 
     .EXAMPLE
-        .\Securo.ps1 -Hash -FileToHashPath ".\Securo.ps1" -Algorithm "SHA256"
+        .\Securo.ps1 -Hash -FileToHashPath ".\Securo.ps1" -Algorithm "SHA256" -Verbose
+
+    .EXAMPLE
+        .\Securo.ps1 -Hash -FileDirHashPath "D:\path\to\directory" -Algorithm "MD5" -Verbose
 #>
 [CmdletBinding()]
 param (
@@ -89,16 +92,16 @@ param (
     [ValidateNotNullOrEmpty()]
     [ValidateScript( { Test-Path -Path $_ })]
     [String]
-    $FileToHashPath,
+    $FileDirHashPath,
 
     [Parameter(Mandatory = $false)]
     [ValidateNotNullOrEmpty()]
-    [ValidateScript( { if (-not ($_ -in @("SHA1", "SHA256", "SHA384", "SHA512", "MD5"))) { Write-Error -Message "Invalid algorithm type." break } })]
+    [ValidateScript( { ($_ -in @("SHA1", "SHA256", "SHA384", "SHA512", "MD5")) })] 
     [String]
     $Algorithm
 )
 
-$Version = "0.0.1"
+$Version = "0.0.2"
 
 # Check that a switch is supplied.
 if (-not $Gpg -and -not $Hash) {
@@ -165,13 +168,30 @@ if ($Gpg) {
 
 # Hashing related tasks.
 if ($Hash) {
-    Write-Verbose -Message "Attempting to generate hash for the file: $($FileToHashPath) using the algorithm: $($Algorithm)"
-    try {
-        $Command = Get-FileHash -Path $FileToHashPath -Algorithm $Algorithm -Verbose:($PSBoundParameters["Verbose"] -eq $true)
-        Write-Output -InputObject "File hash: $($Command.Hash) using the algorithm: $($Algorithm)"
+    # Check if path supplied is a file or directory.
+    if ((Get-Item -Path $FileDirHashPath) -is [System.IO.DirectoryInfo]) {
+        Write-Verbose -Message "Attempting to hash all files in the directory: $($FileDirHashPath) using the algorithm: $($Algorithm)"
+        # Get all files recursively in directory and hash them.
+        try {
+            $FileHashes = Get-ChildItem -Path $FileDirHashPath -Recurse | Get-FileHash -Algorithm $Algorithm -Verbose:($PSBoundParameters["Verbose"] -eq $true)
+            Write-Output -InputObject "File hashes for directory: $($FileDirHashPath) using algorithm: $($Algorithm)"
+            Write-Output -InputObject ($FileHashes | Format-Table -Property "Hash", "Path")
+        }
+        catch {
+            Write-Error -Message "Failed to hash the directory: $($FileDirHashPath) with the following error: $($_.Exception.Message)"
+            break
+        }
     }
-    catch {
-        Write-Error -Message "Failed to hash the file: $($FileToHashPath) with the following error: $($_.Exception.Message)"
-        break
+    # Path is to a single file. Hash it.
+    else {
+        Write-Verbose -Message "Attempting to generate hash for the file: $($FileDirHashPath) using the algorithm: $($Algorithm)"
+        try {
+            $Command = Get-FileHash -Path $FileDirHashPath -Algorithm $Algorithm -Verbose:($PSBoundParameters["Verbose"] -eq $true)
+            Write-Output -InputObject "File hash: $($Command.Hash) for file: $($FileDirHashPath) using the algorithm: $($Algorithm)"
+        }
+        catch {
+            Write-Error -Message "Failed to hash the file: $($FileDirHashPath) with the following error: $($_.Exception.Message)"
+            break
+        }
     }
 }
